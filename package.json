@@ -1,0 +1,19 @@
+{
+  "dependencies": {
+    "@livekit/rtc-node": "^1.2.1",
+    "playwright": "^1.64.1"
+  },
+  "name": "test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "devDependencies": {
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

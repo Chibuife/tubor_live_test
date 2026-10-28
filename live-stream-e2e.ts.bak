@@ -1,0 +1,1475 @@
+/**
+ * Tubor EX LiveKit end-to-end test.
+ *
+ * Inputs: users.json (generated seed file).
+ * Targets are hard-coded to the supplied Render deployments.
+ * Uses real Tubor UI login/broadcast flows with a fake Chromium camera,
+ * then checks whether viewer pages render video and advance playback.
+ *
+ * Examples:
+ *   npx tsx .\live-stream-e2e.ts --users-file .\users.json --streamers 1 --viewers-per-stream 3 --duration-seconds 10
+ *   npx tsx .\live-stream-e2e.ts --users-file .\users.json --streamers 1 --viewers-per-stream 50 --duration-seconds 120 --ramp-ms 500
+ *   npx tsx .\live-stream-e2e.ts --users-file .\users.json --streamers 5 --viewers-per-stream 19
+ *
+ * Omit --headed to run Chromium without visible browser windows.
+ */
+
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type Dialog,
+  type Page,
+} from 'playwright';
+
+const FRONTEND_BASE = 'https://tubor-frontend.onrender.com';
+const API_BASE = 'https://tubor-api.onrender.com';
+const RESULTS_DIR = resolve(process.cwd(), 'live-e2e-results');
+
+const DEFAULTS = {
+  usersFile: './users.json',
+  streamers: 5,
+  viewersPerStream: 10,
+  durationSeconds: 120,
+  rampMs: 250,
+  loginTimeoutMs: 25_000,
+  broadcastTimeoutMs: 60_000,
+  mediaTimeoutMs: 35_000,
+  maxAccounts: 100,
+};
+
+type SeedUser = {
+  id?: string;
+  identityId?: string;
+  email: string;
+  password: string;
+  username: string;
+  displayName?: string;
+  roles?: string[];
+};
+
+type SeedFile = {
+  generatedAt?: string;
+  emailDomain?: string;
+  seededInto?: Record<string, string>;
+  users: SeedUser[];
+};
+
+type Config = typeof DEFAULTS & {
+  usersFile: string;
+  keepStreams: boolean;
+  headed: boolean;
+};
+
+type Diagnostics = {
+  consoleErrors: string[];
+  pageErrors: string[];
+  failedRequests: string[];
+  badResponses: string[];
+  /** Failed image, script, stylesheet, and font loads. */
+  failedAssets: string[];
+};
+
+type CleanupResult = { ok: boolean; details?: string };
+
+type StreamResult = {
+  index: number;
+  username: string;
+  streamUrl: string;
+  status: 'started' | 'failed';
+  error?: string;
+  /** Cleanup attempted if startup failed after the broadcast went live. */
+  startupCleanup?: CleanupResult;
+  diagnostics: Diagnostics;
+};
+
+type ViewerResult = {
+  username: string;
+  streamUrl: string;
+  status: 'passed' | 'failed';
+  connectedAt?: string;
+  media?: {
+    videoCount: number;
+    videoWidth: number;
+    videoHeight: number;
+    readyState: number;
+    paused: boolean;
+    currentTimeBefore: number;
+    currentTimeAfter: number;
+    playbackAdvanced: boolean;
+    videoTrackCount: number;
+    audioTrackCount: number;
+  };
+  error?: string;
+  diagnostics: Diagnostics;
+};
+
+type LiveViewerSession = {
+  context: BrowserContext;
+  page: Page;
+  result: ViewerResult;
+};
+
+type BroadcasterSession = {
+  context: BrowserContext;
+  page: Page;
+  result: StreamResult;
+};
+
+function parseArgs(argv: string[]): Config {
+  const values: Record<string, string | boolean> = {};
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const part = argv[i]!;
+    if (!part.startsWith('--')) continue;
+
+    const equals = part.indexOf('=');
+    if (equals > -1) {
+      values[part.slice(2, equals)] = part.slice(equals + 1);
+      continue;
+    }
+
+    const key = part.slice(2);
+    const next = argv[i + 1];
+    if (next && !next.startsWith('--')) {
+      values[key] = next;
+      i += 1;
+    } else {
+      values[key] = true;
+    }
+  }
+
+  const numberArg = (name: string, fallback: number): number => {
+    const raw = values[name];
+    if (raw === undefined || raw === true) return fallback;
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 0) {
+      throw new Error(`--${name} must be a non-negative integer.`);
+    }
+    return value;
+  };
+
+  const config: Config = {
+    ...DEFAULTS,
+    usersFile:
+      typeof values['users-file'] === 'string'
+        ? values['users-file']
+        : DEFAULTS.usersFile,
+    streamers: numberArg('streamers', DEFAULTS.streamers),
+    viewersPerStream: numberArg('viewers-per-stream', DEFAULTS.viewersPerStream),
+    durationSeconds: numberArg('duration-seconds', DEFAULTS.durationSeconds),
+    rampMs: numberArg('ramp-ms', DEFAULTS.rampMs),
+    loginTimeoutMs: numberArg('login-timeout-ms', DEFAULTS.loginTimeoutMs),
+    broadcastTimeoutMs: numberArg('broadcast-timeout-ms', DEFAULTS.broadcastTimeoutMs),
+    mediaTimeoutMs: numberArg('media-timeout-ms', DEFAULTS.mediaTimeoutMs),
+    maxAccounts: numberArg('max-accounts', DEFAULTS.maxAccounts),
+    keepStreams: Boolean(values['keep-streams']),
+    headed: Boolean(values.headed),
+  };
+
+  if (config.streamers < 1) throw new Error('--streamers must be at least 1.');
+  if (config.viewersPerStream < 1) {
+    throw new Error('--viewers-per-stream must be at least 1.');
+  }
+  if (config.durationSeconds < 1) {
+    throw new Error('--duration-seconds must be at least 1.');
+  }
+  if (config.maxAccounts > DEFAULTS.maxAccounts) {
+    console.warn(
+      `Note: --max-accounts ${config.maxAccounts} is above the documented 100-account seed file size.`,
+    );
+  }
+
+  return config;
+}
+
+function makeDiagnostics(): Diagnostics {
+  return {
+    consoleErrors: [],
+    pageErrors: [],
+    failedRequests: [],
+    badResponses: [],
+    failedAssets: [],
+  };
+}
+
+function attachDiagnostics(page: Page, diagnostics: Diagnostics, label = 'page'): void {
+  const addBounded = (list: string[], value: string): void => {
+    if (list.length < 100) list.push(value.slice(0, 1_000));
+  };
+
+  const safeLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_');
+  let imageFailureScreenshotSaved = false;
+
+  // Capture the page when its first image request fails. This is a page
+  // screenshot, not a copy of the remote image itself.
+  const captureImageFailureScreenshot = (reason: string): void => {
+    if (imageFailureScreenshotSaved || page.isClosed()) return;
+    imageFailureScreenshotSaved = true;
+
+    const screenshotPath = resolve(
+      RESULTS_DIR,
+      `${safeLabel}-image-load-failed-${Date.now()}.png`,
+    );
+
+    console.error(`[image] Failed image load for ${label}: ${reason}`);
+
+    void page
+      .screenshot({ path: screenshotPath, fullPage: true, timeout: 15_000 })
+      .then(() => {
+        console.log(`[image] Failure screenshot saved: ${screenshotPath}`);
+      })
+      .catch((error: unknown) => {
+        console.warn(
+          `[image] Could not capture failure screenshot: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      });
+  };
+
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      addBounded(diagnostics.consoleErrors, message.text());
+    }
+  });
+
+  page.on('pageerror', (error) => {
+    addBounded(diagnostics.pageErrors, error.message);
+  });
+
+  page.on('requestfailed', (request) => {
+    const url = request.url();
+    const resourceType = request.resourceType();
+    const failure = request.failure()?.errorText ?? 'request failed';
+
+    if (/api|live|livekit|whip|webrtc|rtc/i.test(url)) {
+      addBounded(
+        diagnostics.failedRequests,
+        `${request.method()} ${url}: ${failure}`,
+      );
+    }
+
+    const isAsset =
+      ['image', 'script', 'stylesheet', 'font'].includes(resourceType) ||
+      /\/_next\/image(?:\?|$)|\.(png|jpe?g|gif|webp|avif|svg)(?:\?|$)/i.test(url);
+
+    if (isAsset) {
+      addBounded(
+        diagnostics.failedAssets,
+        `${resourceType} ${request.method()} ${url}: ${failure}`,
+      );
+      if (resourceType === 'image') {
+        captureImageFailureScreenshot(`${url}: ${failure}`);
+      }
+    }
+  });
+
+  page.on('response', (response) => {
+    const url = response.url();
+    const status = response.status();
+    const resourceType = response.request().resourceType();
+
+    if (status >= 400 && /api|live|livekit|whip|webrtc|rtc/i.test(url)) {
+      addBounded(diagnostics.badResponses, `${status} ${url}`);
+    }
+
+    const isAsset =
+      ['image', 'script', 'stylesheet', 'font'].includes(resourceType) ||
+      /\/_next\/image(?:\?|$)|\.(png|jpe?g|gif|webp|avif|svg)(?:\?|$)/i.test(url);
+
+    if (status >= 400 && isAsset) {
+      addBounded(
+        diagnostics.failedAssets,
+        `${status} ${resourceType} ${url}`,
+      );
+      if (resourceType === 'image') {
+        captureImageFailureScreenshot(`${status} ${url}`);
+      }
+    }
+  });
+}
+
+function loadUsers(
+  filePath: string,
+): { seed: SeedFile; users: SeedUser[]; absolutePath: string } {
+  const absolutePath = resolve(process.cwd(), filePath);
+  if (!existsSync(absolutePath)) {
+    throw new Error(
+      `Could not find users.json at ${absolutePath}. Put the generated users.json in the repo root or pass --users-file.`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(absolutePath, 'utf8')) as unknown;
+  } catch (error) {
+    throw new Error(
+      `users.json is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const seed = (Array.isArray(parsed) ? { users: parsed } : parsed) as SeedFile;
+  if (!seed || !Array.isArray(seed.users)) {
+    throw new Error(
+      'Expected users.json to contain a top-level "users" array (the SeedFile format).',
+    );
+  }
+
+  const users = seed.users.filter((user): user is SeedUser => Boolean(
+    user &&
+      typeof user.email === 'string' && user.email.includes('@') &&
+      typeof user.password === 'string' && user.password.length > 0 &&
+      typeof user.username === 'string' && user.username.length > 0,
+  ));
+
+  if (users.length !== seed.users.length) {
+    throw new Error(
+      `users.json has ${seed.users.length} entries, but only ${users.length} have email, password, and username. Check the file format.`,
+    );
+  }
+
+  if (new Set(users.map((user) => user.email.toLowerCase())).size !== users.length) {
+    throw new Error(
+      'users.json contains duplicate email addresses; each browser session needs a unique seeded account.',
+    );
+  }
+
+  return { seed, users, absolutePath };
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j]!, result[i]!];
+  }
+  return result;
+}
+
+const delay = (ms: number) =>
+  new Promise<void>((resolvePromise) => setTimeout(resolvePromise, ms));
+
+async function safeText(locator: ReturnType<Page['locator']>): Promise<string> {
+  try {
+    return (await locator.innerText({ timeout: 800 })).trim();
+  } catch {
+    return '';
+  }
+}
+
+async function isVisible(locator: ReturnType<Page['locator']>): Promise<boolean> {
+  try {
+    return await locator.isVisible({ timeout: 800 });
+  } catch {
+    return false;
+  }
+}
+
+async function hasLoginForm(page: Page): Promise<boolean> {
+  const email = page.locator(
+    'input[type="email"], input[name*="email" i], input[autocomplete="username"], input[placeholder*="email" i]',
+  ).first();
+  const password = page.locator('input[type="password"]').first();
+  return (await isVisible(email)) && (await isVisible(password));
+}
+
+/** Wait for client-side rendering/hydration before declaring the form missing. */
+async function waitForLoginForm(page: Page, timeoutMs = 5_000): Promise<boolean> {
+  const email = page.locator(
+    'input[type="email"], input[name*="email" i], input[autocomplete="username"], input[placeholder*="email" i]',
+  ).first();
+  const password = page.locator('input[type="password"]').first();
+
+  try {
+    await Promise.all([
+      email.waitFor({ state: 'visible', timeout: timeoutMs }),
+      password.waitFor({ state: 'visible', timeout: timeoutMs }),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function gotoWithRetry(page: Page, url: string): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      await page.waitForTimeout(600);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) await delay(1_200 * (attempt + 1));
+    }
+  }
+  throw new Error(
+    `Unable to open ${url}: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+  );
+}
+
+async function findLoginForm(page: Page): Promise<void> {
+  await gotoWithRetry(page, FRONTEND_BASE);
+  if (await waitForLoginForm(page, 5_000)) return;
+
+  // Prefer links/buttons from the deployed UI over guessed paths.
+  const linkLocator = page.locator('a[href]');
+  const count = Math.min(await linkLocator.count(), 150);
+
+  for (let i = 0; i < count; i += 1) {
+    const link = linkLocator.nth(i);
+    const href = await link.getAttribute('href').catch(() => null);
+    const text = `${await safeText(link)} ${(await link.getAttribute('aria-label').catch(() => '')) ?? ''}`;
+
+    if (!href || !/login|log-in|sign-in|signin|auth/i.test(`${href} ${text}`)) {
+      continue;
+    }
+
+    const target = href.startsWith('http')
+      ? href
+      : new URL(href, FRONTEND_BASE).toString();
+
+    await gotoWithRetry(page, target);
+    if (await waitForLoginForm(page, 5_000)) return;
+  }
+
+  const candidates = [
+    '/login',
+    '/auth/login',
+    '/sign-in',
+    '/auth/sign-in',
+    '/signin',
+    '/auth/signin',
+  ];
+
+  for (const path of candidates) {
+    await gotoWithRetry(page, `${FRONTEND_BASE}${path}`);
+    if (await waitForLoginForm(page, 5_000)) return;
+  }
+
+  const title = await page.title().catch(() => '');
+  const body = (await page.locator('body').innerText().catch(() => ''))
+    .replace(/\s+/g, ' ')
+    .slice(0, 500);
+  throw new Error(
+    `Could not find a login form. URL: ${page.url()}; title: ${title}; page text: ${body || '(empty)'}`,
+  );
+}
+
+async function login(page: Page, user: SeedUser, timeoutMs: number): Promise<void> {
+  await findLoginForm(page);
+
+  const email = page.locator(
+    'input[type="email"], input[name*="email" i], input[autocomplete="username"], input[placeholder*="email" i]',
+  ).first();
+  const password = page.locator('input[type="password"]').first();
+
+  if (!(await isVisible(email)) || !(await isVisible(password))) {
+    throw new Error('Login form appeared, but the email or password field is not visible.');
+  }
+
+  await email.fill(user.email, { timeout: timeoutMs });
+  await password.fill(user.password, { timeout: timeoutMs });
+
+  const clickables = page.locator('button, [role="button"], input[type="submit"]');
+  const clickableCount = Math.min(await clickables.count(), 80);
+  let submitted = false;
+
+  for (let i = 0; i < clickableCount; i += 1) {
+    const item = clickables.nth(i);
+    if (!(await isVisible(item))) continue;
+
+    const label = `${await safeText(item)} ${(await item.getAttribute('aria-label').catch(() => '')) ?? ''} ${(await item.getAttribute('type').catch(() => '')) ?? ''}`;
+    if (/sign\s*in|log\s*in|login|continue|submit/i.test(label)) {
+      await item.click({ timeout: timeoutMs });
+      submitted = true;
+      break;
+    }
+  }
+
+  if (!submitted) await password.press('Enter', { timeout: timeoutMs });
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(400);
+    if (!(await hasLoginForm(page))) break;
+  }
+
+  if (await hasLoginForm(page)) {
+    const body = await page.locator('body').innerText().catch(() => '');
+    const likelyErrors = body
+      .split('\n')
+      .map((s) => s.trim())
+      .filter((s) => /invalid|incorrect|failed|unauthorized|try again|not found|error/i.test(s))
+      .slice(0, 8);
+    throw new Error(
+      `Login did not leave the login form for ${user.username}. ${likelyErrors.join(' | ') || 'Check that this seed account exists in the deployed environment and its password is current.'}`,
+    );
+  }
+}
+
+async function clickMatching(
+  page: Page,
+  pattern: RegExp,
+  timeoutMs = 4_000,
+): Promise<boolean> {
+  const locator = page.locator('button, a[href], [role="button"], input[type="submit"]');
+  const count = Math.min(await locator.count(), 180);
+
+  for (let i = 0; i < count; i += 1) {
+    const item = locator.nth(i);
+    if (!(await isVisible(item))) continue;
+
+    const parts = [
+      await safeText(item),
+      (await item.getAttribute('aria-label').catch(() => '')) ?? '',
+      (await item.getAttribute('title').catch(() => '')) ?? '',
+      (await item.getAttribute('value').catch(() => '')) ?? '',
+    ];
+    const label = parts.join(' ').replace(/\s+/g, ' ').trim();
+    if (!pattern.test(label)) continue;
+
+    try {
+      await item.click({ timeout: timeoutMs });
+      await page.waitForTimeout(750);
+      return true;
+    } catch {
+      // Continue to the next visible candidate; responsive UIs can have hidden duplicates.
+    }
+  }
+
+  return false;
+}
+
+async function setStreamTitle(page: Page, title: string): Promise<void> {
+  const titleInputs = page.locator(
+    'input:not([type="password"]):not([type="email"]):not([type="hidden"]), textarea',
+  );
+  const count = Math.min(await titleInputs.count(), 80);
+
+  for (let i = 0; i < count; i += 1) {
+    const field = titleInputs.nth(i);
+    if (!(await isVisible(field))) continue;
+
+    const metadata = [
+      (await field.getAttribute('name').catch(() => '')) ?? '',
+      (await field.getAttribute('placeholder').catch(() => '')) ?? '',
+      (await field.getAttribute('aria-label').catch(() => '')) ?? '',
+      (await field.getAttribute('id').catch(() => '')) ?? '',
+    ].join(' ');
+
+    if (/title|stream name|broadcast name/i.test(metadata)) {
+      await field.fill(title).catch(() => undefined);
+      return;
+    }
+  }
+}
+
+/** Reject generic routes such as /live/go instead of treating them as stream IDs. */
+function isLikelyStreamId(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const id = value.trim();
+  const reservedRoutes = new Set([
+    'go', 'create', 'studio', 'new', 'broadcast', 'start', 'go-live', 'setup',
+    'watch', 'all', 'hosted', 'history', 'discover',
+  ]);
+
+  if (!id || reservedRoutes.has(id.toLowerCase())) return false;
+
+  // This project has used UUID stream IDs. Also allow longer opaque IDs.
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+    /^[a-zA-Z0-9_-]{20,}$/.test(id)
+  );
+}
+
+async function extractStreamUrl(page: Page): Promise<string | null> {
+  const current = new URL(page.url());
+  const match = current.pathname.match(/\/live\/([^/]+)/i);
+
+  if (match && isLikelyStreamId(match[1])) {
+    return `${current.origin}${current.pathname}`;
+  }
+
+  const queryId =
+    current.searchParams.get('streamId') ?? current.searchParams.get('stream_id');
+  if (isLikelyStreamId(queryId)) {
+    return `${FRONTEND_BASE}/live/${encodeURIComponent(queryId!)}`;
+  }
+
+  // Some host screens expose the stream ID as a data attribute.
+  const domId = await page
+    .locator('[data-stream-id]')
+    .first()
+    .getAttribute('data-stream-id')
+    .catch(() => null);
+  if (isLikelyStreamId(domId)) {
+    return `${FRONTEND_BASE}/live/${encodeURIComponent(domId!)}`;
+  }
+
+  const anchors = page.locator('a[href]');
+  const count = Math.min(await anchors.count(), 180);
+  for (let i = 0; i < count; i += 1) {
+    const href = await anchors.nth(i).getAttribute('href').catch(() => null);
+    if (!href) continue;
+
+    try {
+      const resolved = new URL(href, FRONTEND_BASE);
+      const linkMatch = resolved.pathname.match(/\/live\/([^/]+)/i);
+      if (linkMatch && isLikelyStreamId(linkMatch[1])) {
+        return `${resolved.origin}${resolved.pathname}`;
+      }
+    } catch {
+      // Ignore malformed links and continue searching.
+    }
+  }
+
+  return null;
+}
+
+async function looksLikeLiveHost(page: Page): Promise<boolean> {
+  const body = (await page.locator('body').innerText().catch(() => '')).toLowerCase();
+  return /end\s+(your\s+)?live|end stream|stop streaming|you are live|live is running|streaming live/.test(body);
+}
+
+// End-live cleanup helpers. These are declared before startup so that startup
+// failures can also try to stop a broadcast that was already created.
+const END_LIVE_CONFIRMATION_TEXT =
+  /end your live for everyone|end this live|end stream for everyone|are you sure[\s\S]*end/i;
+const END_LIVE_CONTROL =
+  /\b(end\s+(?:your\s+)?live(?:\s+for\s+everyone)?|end\s+stream(?:\s+for\s+everyone)?|stop\s+streaming|end\s+broadcast)\b/i;
+const END_LIVE_CONFIRM_BUTTON =
+  /^(?:end(?:\s+your)?\s+live(?:\s+for\s+everyone|\s+now)?|end\s+stream(?:\s+for\s+everyone)?|end\s+for\s+everyone|confirm\s+end|yes,?\s*end)$/i;
+const CANCEL_END_BUTTON =
+  /\b(cancel|keep\s+(?:the\s+)?live|don't\s+end|do\s+not\s+end|no,?\s*keep)\b/i;
+const STREAM_ENDED_TEXT =
+  /\b(?:(?:your\s+)?live|stream|broadcast)\s+(?:has\s+)?ended\b|you are no longer live|you(?:'|’)re no longer live|stream ended successfully|broadcast ended successfully/i;
+const ACTIVE_LIVE_TEXT =
+  /\byou(?:'|’)re live\b|\byou are live\b|\blive is running\b|\bstreaming live\b|\bbroadcast is live\b/i;
+const START_LIVE_CONTROL =
+  /\b(go live|start live|start streaming|start broadcast|create live)\b/i;
+
+async function hasVisibleAction(page: Page, pattern: RegExp): Promise<boolean> {
+  const actions = page.locator('button, a[href], [role="button"], input[type="submit"]');
+  const count = Math.min(await actions.count(), 180);
+
+  for (let i = count - 1; i >= 0; i -= 1) {
+    const item = actions.nth(i);
+    if (!(await isVisible(item))) continue;
+
+    const label = [
+      await safeText(item),
+      (await item.getAttribute('aria-label').catch(() => null)) ?? '',
+      (await item.getAttribute('title').catch(() => null)) ?? '',
+      (await item.getAttribute('value').catch(() => null)) ?? '',
+    ].join(' ').replace(/\s+/g, ' ').trim();
+
+    if (pattern.test(label) && !CANCEL_END_BUTTON.test(label)) return true;
+  }
+  return false;
+}
+
+async function confirmEndLive(page: Page, timeoutMs = 6_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  const modalRoots = page.locator(
+    '[role="dialog"], [role="alertdialog"], [aria-modal="true"], [data-radix-dialog-content], [data-slot="dialog-content"]',
+  );
+
+  while (Date.now() < deadline) {
+    const modalCount = Math.min(await modalRoots.count(), 30);
+
+    for (let i = modalCount - 1; i >= 0; i -= 1) {
+      const modal = modalRoots.nth(i);
+      if (!(await isVisible(modal))) continue;
+      const modalText = await safeText(modal);
+      if (!END_LIVE_CONFIRMATION_TEXT.test(modalText)) continue;
+
+      const buttons = modal.locator('button, [role="button"], input[type="submit"]');
+      const buttonCount = Math.min(await buttons.count(), 80);
+
+      for (let j = buttonCount - 1; j >= 0; j -= 1) {
+        const button = buttons.nth(j);
+        if (!(await isVisible(button))) continue;
+
+        const label = [
+          await safeText(button),
+          (await button.getAttribute('aria-label').catch(() => null)) ?? '',
+          (await button.getAttribute('title').catch(() => null)) ?? '',
+          (await button.getAttribute('value').catch(() => null)) ?? '',
+        ].join(' ').replace(/\s+/g, ' ').trim();
+
+        if (!END_LIVE_CONFIRM_BUTTON.test(label) || CANCEL_END_BUTTON.test(label)) continue;
+        await button.click({ timeout: 3_000 });
+        await page.waitForTimeout(300);
+        console.log(`[cleanup] Clicked end-live confirmation button: "${label}"`);
+        return true;
+      }
+    }
+
+    // Fallback for custom dialogs without standard dialog attributes.
+    const confirmationText = page.getByText(END_LIVE_CONFIRMATION_TEXT).first();
+    if (await isVisible(confirmationText)) {
+      const actions = page.locator('button, [role="button"], input[type="submit"]');
+      const count = Math.min(await actions.count(), 120);
+
+      for (let i = count - 1; i >= 0; i -= 1) {
+        const button = actions.nth(i);
+        if (!(await isVisible(button))) continue;
+
+        const label = [
+          await safeText(button),
+          (await button.getAttribute('aria-label').catch(() => null)) ?? '',
+          (await button.getAttribute('title').catch(() => null)) ?? '',
+          (await button.getAttribute('value').catch(() => null)) ?? '',
+        ].join(' ').replace(/\s+/g, ' ').trim();
+
+        if (!END_LIVE_CONFIRM_BUTTON.test(label) || CANCEL_END_BUTTON.test(label)) continue;
+        await button.click({ timeout: 3_000 });
+        await page.waitForTimeout(300);
+        console.log(`[cleanup] Clicked end-live confirmation button: "${label}"`);
+        return true;
+      }
+    }
+
+    await page.waitForTimeout(150);
+  }
+
+  return false;
+}
+
+async function waitForBroadcastEnded(
+  page: Page,
+  initialUrl: string,
+  timeoutMs = 12_000,
+): Promise<{ ok: boolean; details: string }> {
+  const deadline = Date.now() + timeoutMs;
+  let lastBody = '';
+  let initialParsedUrl: URL;
+
+  try {
+    initialParsedUrl = new URL(initialUrl);
+  } catch {
+    return {
+      ok: false,
+      details: `Cannot verify stream termination because the initial URL is invalid: ${initialUrl}`,
+    };
+  }
+
+  while (Date.now() < deadline) {
+    if (page.isClosed()) {
+      return {
+        ok: false,
+        details: 'The broadcaster page closed before stream termination could be verified.',
+      };
+    }
+
+    lastBody = (await page.locator('body').innerText().catch(() => ''))
+      .replace(/\s+/g, ' ')
+      .trim();
+    const endActionVisible = await hasVisibleAction(page, END_LIVE_CONTROL);
+    const startActionVisible = await hasVisibleAction(page, START_LIVE_CONTROL);
+    const activeMarker = ACTIVE_LIVE_TEXT.test(lastBody);
+
+    if (STREAM_ENDED_TEXT.test(lastBody) && !endActionVisible && !activeMarker) {
+      return { ok: true, details: 'The UI explicitly reports that the stream has ended.' };
+    }
+
+    if (!endActionVisible && startActionVisible && !activeMarker) {
+      return {
+        ok: true,
+        details: 'The host UI returned to a start-live state and no active live indicator remains.',
+      };
+    }
+
+    try {
+      const currentUrl = new URL(page.url());
+      const leftOriginalStream =
+        currentUrl.origin === initialParsedUrl.origin &&
+        currentUrl.pathname !== initialParsedUrl.pathname &&
+        !/login|sign-in|signin|auth/i.test(currentUrl.pathname) &&
+        !/\/live\/[^/]+/i.test(currentUrl.pathname);
+
+      if (leftOriginalStream && !endActionVisible && !activeMarker) {
+        return {
+          ok: true,
+          details: `The host left the stream page and no active live controls remain (${currentUrl.pathname}).`,
+        };
+      }
+    } catch {
+      // Continue polling and fail verification if no recognizable ended state appears.
+    }
+
+    await page.waitForTimeout(400);
+  }
+
+  return {
+    ok: false,
+    details:
+      `Could not verify that the stream ended within ${timeoutMs}ms. ` +
+      `The UI may still be live or may not expose a recognizable ended state. ` +
+      `URL: ${page.url()}. Last visible page text: ${lastBody.slice(0, 350) || '(empty)'}`,
+  };
+}
+
+async function endBroadcast(page: Page, username: string): Promise<CleanupResult> {
+  const initialUrl = page.url();
+  let nativeDialogHandled = false;
+  let nativeDialogError = '';
+
+  // Register BEFORE clicking the End Live control.
+  const onDialog = async (dialog: Dialog): Promise<void> => {
+    nativeDialogHandled = true;
+    const message = dialog.message();
+    try {
+      await dialog.accept();
+      console.log(`[cleanup] Accepted native browser dialog for ${username}: ${message}`);
+    } catch (error) {
+      nativeDialogError = error instanceof Error ? error.message : String(error);
+      console.error(`[cleanup] Could not accept native dialog for ${username}: ${nativeDialogError}`);
+    }
+  };
+
+  page.on('dialog', onDialog);
+
+  try {
+    const initialBody = (await page.locator('body').innerText().catch(() => ''))
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (
+      STREAM_ENDED_TEXT.test(initialBody) &&
+      !(await hasVisibleAction(page, END_LIVE_CONTROL)) &&
+      !ACTIVE_LIVE_TEXT.test(initialBody)
+    ) {
+      return { ok: true, details: 'The stream was already ended when cleanup started.' };
+    }
+
+    const clickedEnd = await clickMatching(page, END_LIVE_CONTROL, 5_000);
+    if (!clickedEnd) {
+      const verification = await waitForBroadcastEnded(page, initialUrl, 1_500);
+      if (verification.ok) {
+        return {
+          ok: true,
+          details: `No additional End Live click was needed. ${verification.details}`,
+        };
+      }
+      return {
+        ok: false,
+        details: `Could not find an actionable End Live / End Stream control for ${username}. ${verification.details}`,
+      };
+    }
+
+    console.log(`[cleanup] Clicked the original End Live control for ${username}.`);
+    let confirmationClicked = nativeDialogHandled;
+    if (!confirmationClicked) confirmationClicked = await confirmEndLive(page, 6_000);
+
+    const confirmationStillVisible = await isVisible(
+      page.getByText(END_LIVE_CONFIRMATION_TEXT).first(),
+    );
+    if (!confirmationClicked && confirmationStillVisible) {
+      return {
+        ok: false,
+        details: `The end-live confirmation appeared for ${username}, but the test could not click its confirmation button. The stream may still be running.`,
+      };
+    }
+    if (nativeDialogError) {
+      return {
+        ok: false,
+        details: `The browser confirmation could not be accepted for ${username}: ${nativeDialogError}`,
+      };
+    }
+
+    let verification = await waitForBroadcastEnded(page, initialUrl, 12_000);
+
+    if (!verification.ok && await hasVisibleAction(page, END_LIVE_CONTROL)) {
+      console.warn(`[cleanup] Stream ending not verified for ${username}; attempting one cleanup retry.`);
+      const retryConfirmationVisible = await isVisible(
+        page.getByText(END_LIVE_CONFIRMATION_TEXT).first(),
+      );
+      let retryConfirmed = false;
+
+      if (retryConfirmationVisible) {
+        retryConfirmed = await confirmEndLive(page, 4_000);
+      } else {
+        const clickedAgain = await clickMatching(page, END_LIVE_CONTROL, 3_000);
+        if (clickedAgain) {
+          retryConfirmed = nativeDialogHandled;
+          if (!retryConfirmed) retryConfirmed = await confirmEndLive(page, 4_000);
+        }
+      }
+
+      if (retryConfirmed && !nativeDialogError) {
+        verification = await waitForBroadcastEnded(page, initialUrl, 12_000);
+      }
+    }
+
+    if (!verification.ok) {
+      console.error(`[cleanup] FAILED to verify stream termination for ${username}: ${verification.details}`);
+      return { ok: false, details: verification.details };
+    }
+
+    console.log(`[cleanup] Verified broadcast ended for ${username}. ${verification.details}`);
+    return { ok: true, details: verification.details };
+  } catch (error) {
+    return {
+      ok: false,
+      details: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    page.off('dialog', onDialog);
+  }
+}
+
+async function startBroadcast(
+  browser: Browser,
+  user: SeedUser,
+  streamIndex: number,
+  config: Config,
+): Promise<BroadcasterSession> {
+  const diagnostics = makeDiagnostics();
+  const result: StreamResult = {
+    index: streamIndex,
+    username: user.username,
+    streamUrl: '',
+    status: 'failed',
+    diagnostics,
+  };
+  const context = await browser.newContext({
+    viewport: { width: 1365, height: 900 },
+    permissions: ['camera', 'microphone'],
+    acceptDownloads: false,
+  });
+  const page = await context.newPage();
+  attachDiagnostics(page, diagnostics, `stream-${streamIndex}-${user.username}`);
+
+  try {
+    await login(page, user, config.loginTimeoutMs);
+
+    let started = await clickMatching(
+      page,
+      /\b(go live|start live|start streaming|broadcast live|start broadcast|create live)\b/i,
+    );
+
+    if (!started) {
+      await gotoWithRetry(page, `${FRONTEND_BASE}/live`);
+      started = await clickMatching(
+        page,
+        /\b(go live|start live|start streaming|broadcast live|start broadcast|create live)\b/i,
+      );
+    }
+
+    if (!started) {
+      for (const path of ['/live/create', '/live/studio', '/live/new', '/go-live', '/live/broadcast']) {
+        await gotoWithRetry(page, `${FRONTEND_BASE}${path}`).catch(() => undefined);
+        const body = await page.locator('body').innerText().catch(() => '');
+        if (/404|not found/i.test(body)) continue;
+
+        if (await clickMatching(
+          page,
+          /\b(go live|start live|start streaming|broadcast live|start broadcast|create live)\b/i,
+        )) {
+          started = true;
+          break;
+        }
+
+        const hasFormField = await page.locator('input, textarea, select').count() > 0;
+        if (hasFormField) {
+          started = true;
+          break;
+        }
+      }
+    }
+
+    if (!started) {
+      throw new Error('Could not find a visible Go Live / Start Streaming control or a recognizable live creation form after login.');
+    }
+
+    const title = `Tubor EX E2E Stream ${streamIndex} - ${new Date().toISOString()}`;
+    const deadline = Date.now() + config.broadcastTimeoutMs;
+    let streamUrl: string | null = null;
+    let submitClicked = false;
+
+    while (Date.now() < deadline) {
+      await setStreamTitle(page, title);
+      streamUrl = await extractStreamUrl(page);
+      if (streamUrl && await looksLikeLiveHost(page)) break;
+
+      // Do not repeatedly click start controls once a submit has succeeded.
+      if (!submitClicked) {
+        const clicked = await clickMatching(
+          page,
+          /\b(start live|start streaming|start broadcast|broadcast now|go live|publish live|start stream|begin live)\b/i,
+          5_000,
+        );
+
+        if (clicked) {
+          submitClicked = true;
+        } else {
+          const bodyText = (await page.locator('body').innerText().catch(() => '')).toLowerCase();
+          if (/stream title|stream setup|broadcast setup|select game|camera|microphone/.test(bodyText)) {
+            submitClicked = await clickMatching(page, /\b(continue|next|start)\b/i, 3_000);
+          }
+        }
+      }
+
+      await page.waitForTimeout(1_000);
+      streamUrl = await extractStreamUrl(page);
+      if (streamUrl && await looksLikeLiveHost(page)) break;
+    }
+
+    if (!streamUrl) {
+      throw new Error(
+        `Start flow did not expose a valid stream ID within ${config.broadcastTimeoutMs}ms. ` +
+        `Current page: ${page.url()}. Generic routes such as /live/go are intentionally rejected.`,
+      );
+    }
+
+    if (!(await looksLikeLiveHost(page))) {
+      throw new Error(
+        `A stream URL was found (${streamUrl}), but the page did not show recognizable active-broadcast controls. ` +
+        'The test will not assume that the broadcast successfully started.',
+      );
+    }
+
+    result.streamUrl = streamUrl;
+    result.status = 'started';
+    console.log(`[stream ${streamIndex}] started with ${user.username}: ${streamUrl}`);
+    return { context, page, result };
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : String(error);
+    await page
+      .screenshot({
+        path: resolve(RESULTS_DIR, `stream-${streamIndex}-start-failed.png`),
+        fullPage: true,
+      })
+      .catch(() => undefined);
+
+    // A failure to discover a valid stream URL must not leave a live broadcast
+    // running. Attempt UI cleanup before closing the broadcaster's context.
+    if (await looksLikeLiveHost(page).catch(() => false)) {
+      result.startupCleanup = await endBroadcast(page, user.username);
+      if (!result.startupCleanup.ok) {
+        result.error += ` | Startup cleanup failed: ${result.startupCleanup.details ?? 'unknown cleanup error'}`;
+      }
+    }
+
+    await context.close().catch(() => undefined);
+    console.error(`[stream ${streamIndex}] FAILED for ${user.username}: ${result.error}`);
+    return { context, page, result };
+  }
+}
+
+async function readVideoMetrics(
+  page: Page,
+): Promise<NonNullable<ViewerResult['media']> | null> {
+  return page.evaluate(() => {
+    const videos = Array.from(document.querySelectorAll('video'));
+    const visible = videos.filter((video) => {
+      const style = getComputedStyle(video);
+      const rect = video.getBoundingClientRect();
+      return (
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        rect.width > 0 &&
+        rect.height > 0
+      );
+    });
+    const candidates = visible.filter(
+      (video) => video.videoWidth > 0 && video.videoHeight > 0 && video.readyState >= 2,
+    );
+    if (candidates.length === 0) return null;
+
+    const video = candidates.sort(
+      (a, b) => b.videoWidth * b.videoHeight - a.videoWidth * a.videoHeight,
+    )[0]!;
+    const stream = video.srcObject instanceof MediaStream ? video.srcObject : null;
+
+    return {
+      videoCount: videos.length,
+      videoWidth: video.videoWidth,
+      videoHeight: video.videoHeight,
+      readyState: video.readyState,
+      paused: video.paused,
+      currentTimeBefore: video.currentTime,
+      currentTimeAfter: video.currentTime,
+      playbackAdvanced: false,
+      videoTrackCount: stream?.getVideoTracks().length ?? 0,
+      audioTrackCount: stream?.getAudioTracks().length ?? 0,
+    };
+  }).catch(() => null);
+}
+
+async function attemptPlayback(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    for (const video of Array.from(document.querySelectorAll('video'))) {
+      // Muted autoplay is allowed by Chromium and does not disable audio reception.
+      video.muted = true;
+      void video.play().catch(() => undefined);
+    }
+  }).catch(() => undefined);
+}
+
+async function startViewer(
+  browser: Browser,
+  user: SeedUser,
+  streamUrl: string,
+  rampDelayMs: number,
+  config: Config,
+): Promise<LiveViewerSession> {
+  if (rampDelayMs > 0) await delay(rampDelayMs);
+
+  const diagnostics = makeDiagnostics();
+  const result: ViewerResult = {
+    username: user.username,
+    streamUrl,
+    status: 'failed',
+    diagnostics,
+  };
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    permissions: ['camera', 'microphone'],
+  });
+  const page = await context.newPage();
+  attachDiagnostics(page, diagnostics, `viewer-${user.username}`);
+
+  try {
+    await login(page, user, config.loginTimeoutMs);
+    await gotoWithRetry(page, streamUrl);
+
+    const deadline = Date.now() + config.mediaTimeoutMs;
+    let metrics: NonNullable<ViewerResult['media']> | null = null;
+
+    while (Date.now() < deadline) {
+      await attemptPlayback(page);
+      metrics = await readVideoMetrics(page);
+      if (metrics) break;
+      await page.waitForTimeout(500);
+    }
+
+    if (!metrics) {
+      const pageText = (await page.locator('body').innerText().catch(() => ''))
+        .replace(/\s+/g, ' ')
+        .slice(0, 700);
+      throw new Error(
+        `No visible video element with decoded frames within ${config.mediaTimeoutMs}ms. Page text: ${pageText}`,
+      );
+    }
+
+    const before = metrics.currentTimeBefore;
+    await page.waitForTimeout(2_000);
+    const afterMetrics = await readVideoMetrics(page);
+    if (!afterMetrics) {
+      throw new Error('Video element stopped rendering before the playback-progress check.');
+    }
+
+    const after = afterMetrics.currentTimeBefore;
+    const playbackAdvanced = after > before + 0.15;
+    metrics = {
+      ...afterMetrics,
+      currentTimeBefore: before,
+      currentTimeAfter: after,
+      playbackAdvanced,
+    };
+
+    if (!playbackAdvanced) {
+      throw new Error(
+        `A video frame was decoded (${metrics.videoWidth}x${metrics.videoHeight}), but the playback clock did not advance (before=${before.toFixed(2)}, after=${after.toFixed(2)}).`,
+      );
+    }
+
+    result.status = 'passed';
+    result.connectedAt = new Date().toISOString();
+    result.media = metrics;
+    console.log(
+      `[viewer] PASS ${user.username} -> ${streamUrl} (${metrics.videoWidth}x${metrics.videoHeight}, advancing playback)`,
+    );
+    return { context, page, result };
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : String(error);
+    await page
+      .screenshot({
+        path: resolve(
+          RESULTS_DIR,
+          `viewer-${user.username.replace(/[^a-zA-Z0-9_-]/g, '_')}-failed.png`,
+        ),
+        fullPage: true,
+      })
+      .catch(() => undefined);
+    await context.close().catch(() => undefined);
+    console.error(`[viewer] FAIL ${user.username} -> ${streamUrl}: ${result.error}`);
+    return { context, page, result };
+  }
+}
+
+async function probe(
+  url: string,
+): Promise<{ url: string; status?: number; ok?: boolean; error?: string }> {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(20_000),
+      redirect: 'follow',
+    });
+    return { url, status: response.status, ok: response.ok };
+  } catch (error) {
+    return {
+      url,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function main(): Promise<void> {
+  const config = parseArgs(process.argv.slice(2));
+  mkdirSync(RESULTS_DIR, { recursive: true });
+  const { seed, users, absolutePath } = loadUsers(config.usersFile);
+  const viewerCount = config.streamers * config.viewersPerStream;
+  const requiredAccounts = config.streamers + viewerCount;
+
+  if (requiredAccounts > users.length) {
+    throw new Error(
+      `This run needs ${requiredAccounts} distinct accounts (${config.streamers} streamers + ${viewerCount} viewers), but users.json contains ${users.length}. Reduce --viewers-per-stream or add seeded accounts. Do not reuse one account in simultaneous sessions.`,
+    );
+  }
+  if (requiredAccounts > config.maxAccounts) {
+    throw new Error(
+      `This run needs ${requiredAccounts} accounts, above --max-accounts=${config.maxAccounts}.`,
+    );
+  }
+  if (requiredAccounts > 80) {
+    console.warn(
+      `WARNING: ${requiredAccounts} separate authenticated browser contexts may use substantial RAM/CPU. Use a smaller smoke test first.`,
+    );
+  }
+
+  const preflight = await Promise.all([
+    probe(FRONTEND_BASE),
+    probe(API_BASE),
+    probe(`${API_BASE}/health`),
+  ]);
+  console.log('[preflight]', JSON.stringify(preflight));
+
+  const frontProbe = preflight[0]!;
+  if (frontProbe.error || (frontProbe.status !== undefined && frontProbe.status >= 500)) {
+    throw new Error(
+      `Frontend preflight failed (${frontProbe.status ?? frontProbe.error}). Confirm the Render frontend is awake and reachable before running the test.`,
+    );
+  }
+
+  const apiResponded = preflight
+    .slice(1)
+    .some((probeResult) => !probeResult.error && probeResult.status !== undefined && probeResult.status < 500);
+  if (!apiResponded) {
+    throw new Error(
+      'The API did not return a non-5xx response at its root or /health. Confirm the Render API is awake and reachable before testing.',
+    );
+  }
+
+  // Prefer accounts carrying the Streamer role; fall back to other seed users.
+  const streamerPreferred = users.filter((user) =>
+    (user.roles ?? []).some((role) => /streamer/i.test(role)),
+  );
+  const streamerIds = new Set(streamerPreferred.map((user) => user.email.toLowerCase()));
+  const streamers = [
+    ...shuffle(streamerPreferred),
+    ...shuffle(users.filter((user) => !streamerIds.has(user.email.toLowerCase()))),
+  ].slice(0, config.streamers);
+  const streamerEmails = new Set(streamers.map((user) => user.email.toLowerCase()));
+  const viewers = shuffle(
+    users.filter((user) => !streamerEmails.has(user.email.toLowerCase())),
+  ).slice(0, viewerCount);
+
+  if (viewers.length !== viewerCount) {
+    throw new Error(`Could not select ${viewerCount} distinct viewer accounts from users.json.`);
+  }
+
+  const startedAt = new Date().toISOString();
+  const report: Record<string, unknown> = {
+    test: 'Tubor EX Live Stream E2E',
+    startedAt,
+    targets: { frontend: FRONTEND_BASE, api: API_BASE },
+    usersFile: absolutePath,
+    seedGeneratedAt: seed.generatedAt ?? null,
+    seedEmailDomain: seed.emailDomain ?? null,
+    preflight,
+    configuration: {
+      streamers: config.streamers,
+      viewersPerStream: config.viewersPerStream,
+      requestedViewers: viewerCount,
+      requiredUniqueAccounts: requiredAccounts,
+      durationSeconds: config.durationSeconds,
+      rampMs: config.rampMs,
+      keepStreams: config.keepStreams,
+      browserMode: config.headed ? 'headed' : 'headless',
+    },
+    streams: [] as StreamResult[],
+    viewers: [] as ViewerResult[],
+    cleanup: [] as Array<{ username: string; ok: boolean; details?: string }>,
+  };
+
+  let browser: Browser | undefined;
+  const activeBroadcasters: BroadcasterSession[] = [];
+  const activeViewers: LiveViewerSession[] = [];
+  let fatalError: string | undefined;
+
+  try {
+    browser = await chromium.launch({
+      headless: !config.headed,
+      args: [
+        '--use-fake-device-for-media-stream',
+        '--use-fake-ui-for-media-stream',
+        '--auto-select-desktop-capture-source=Entire screen',
+        '--autoplay-policy=no-user-gesture-required',
+        '--disable-background-timer-throttling',
+        '--disable-renderer-backgrounding',
+        '--disable-backgrounding-occluded-windows',
+      ],
+    });
+
+    for (let i = 0; i < streamers.length; i += 1) {
+      const broadcaster = await startBroadcast(browser, streamers[i]!, i + 1, config);
+      (report.streams as StreamResult[]).push(broadcaster.result);
+
+      if (broadcaster.result.status === 'started') {
+        activeBroadcasters.push(broadcaster);
+      } else {
+        throw new Error(
+          `Broadcaster ${streamers[i]!.username} failed to start. See live-e2e-results/stream-${i + 1}-start-failed.png. ${broadcaster.result.error ?? ''}`,
+        );
+      }
+    }
+
+    if (activeBroadcasters.length !== config.streamers) {
+      throw new Error(`Only ${activeBroadcasters.length}/${config.streamers} broadcasters started.`);
+    }
+
+    console.log(
+      `[viewers] ramping up ${viewerCount} viewers at ${config.rampMs}ms per viewer`,
+    );
+
+    const viewerTasks: Promise<LiveViewerSession>[] = [];
+    let viewerIndex = 0;
+    for (let streamIndex = 0; streamIndex < activeBroadcasters.length; streamIndex += 1) {
+      for (let slot = 0; slot < config.viewersPerStream; slot += 1) {
+        const user = viewers[viewerIndex++]!;
+        const streamUrl = activeBroadcasters[streamIndex]!.result.streamUrl;
+        const rampDelayMs = (viewerIndex - 1) * config.rampMs;
+        viewerTasks.push(startViewer(browser, user, streamUrl, rampDelayMs, config));
+      }
+    }
+
+    const viewerSessions = await Promise.all(viewerTasks);
+    for (const session of viewerSessions) {
+      (report.viewers as ViewerResult[]).push(session.result);
+      if (session.result.status === 'passed') activeViewers.push(session);
+    }
+
+    console.log(`[hold] Keeping connected viewers active for ${config.durationSeconds}s`);
+    await delay(config.durationSeconds * 1_000);
+  } catch (error) {
+    fatalError = error instanceof Error ? error.message : String(error);
+    console.error(`[test] FATAL: ${fatalError}`);
+  } finally {
+    // Close viewers first so cleanup isn't competing with active subscriptions.
+    for (const session of activeViewers) {
+      await session.context.close().catch(() => undefined);
+    }
+
+    if (!config.keepStreams) {
+      for (const broadcaster of [...activeBroadcasters].reverse()) {
+        const cleanupResult = await endBroadcast(
+          broadcaster.page,
+          broadcaster.result.username,
+        );
+        (report.cleanup as Array<{ username: string; ok: boolean; details?: string }>).push({
+          username: broadcaster.result.username,
+          ...cleanupResult,
+        });
+        if (!cleanupResult.ok) {
+          console.error(
+            `[cleanup] FAILED for ${broadcaster.result.username}: ${cleanupResult.details}`,
+          );
+        }
+        await broadcaster.context.close().catch(() => undefined);
+      }
+    } else {
+      for (const broadcaster of activeBroadcasters) {
+        await broadcaster.context.close().catch(() => undefined);
+      }
+    }
+
+    if (browser) await browser.close().catch(() => undefined);
+
+    report.finishedAt = new Date().toISOString();
+    report.fatalError = fatalError ?? null;
+    const streams = report.streams as StreamResult[];
+    const viewerResults = report.viewers as ViewerResult[];
+    const regularCleanup = report.cleanup as Array<{ ok: boolean }>;
+    const startupCleanupFailures = streams.filter(
+      (stream) => stream.startupCleanup && !stream.startupCleanup.ok,
+    ).length;
+    const cleanupFailures =
+      regularCleanup.filter((cleanup) => !cleanup.ok).length + startupCleanupFailures;
+
+    report.summary = {
+      broadcastersRequested: config.streamers,
+      broadcastersStarted: streams.filter((stream) => stream.status === 'started').length,
+      viewersRequested: viewerCount,
+      viewersPassed: viewerResults.filter((viewer) => viewer.status === 'passed').length,
+      viewersFailed: viewerResults.filter((viewer) => viewer.status === 'failed').length,
+      mediaPlaybackPassRate: viewerResults.length
+        ? Number(
+            (
+              viewerResults.filter((viewer) => viewer.status === 'passed').length /
+              viewerResults.length
+            ).toFixed(4),
+          )
+        : 0,
+      imageAssetFailures: [
+        ...streams.flatMap((stream) => stream.diagnostics.failedAssets),
+        ...viewerResults.flatMap((viewer) => viewer.diagnostics.failedAssets),
+      ].length,
+      cleanupFailures,
+      result:
+        fatalError ||
+        streams.some((stream) => stream.status !== 'started') ||
+        viewerResults.some((viewer) => viewer.status !== 'passed') ||
+        cleanupFailures > 0
+          ? 'FAILED'
+          : 'PASSED',
+    };
+
+    const reportPath = resolve(RESULTS_DIR, 'live-stream-e2e-report.json');
+    writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+    console.log(`\n[report] ${reportPath}`);
+    console.log(JSON.stringify(report.summary, null, 2));
+  }
+
+  const summary = report.summary as { result: string } | undefined;
+  if (fatalError || summary?.result !== 'PASSED') process.exitCode = 1;
+}
+
+main().catch((error: unknown) => {
+  mkdirSync(RESULTS_DIR, { recursive: true });
+  const reportPath = resolve(RESULTS_DIR, 'live-stream-e2e-report.json');
+  const message = error instanceof Error ? error.message : String(error);
+  writeFileSync(
+    reportPath,
+    `${JSON.stringify(
+      {
+        test: 'Tubor EX Live Stream E2E',
+        fatalError: message,
+        finishedAt: new Date().toISOString(),
+        result: 'FAILED',
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+  console.error(`[test] FATAL: ${message}`);
+  console.error(`[report] ${reportPath}`);
+  process.exitCode = 1;
+});

@@ -1,36 +1,3 @@
-/**
- * Tubor EX backend-only live-stream test (no browser, no UI).
- *
- * What it exercises, all over the public API gateway:
- *   1. POST /api/auth/login                          (streamers; viewers only with --viewer-auth)
- *   2. POST /api/live/streams/go-live                (creates the LIVE and returns `publish`)
- *   3. LiveKit publish with a synthetic moving-bar video track (@livekit/rtc-node)
- *   4. GET  /api/live/streams/:id                    (waits for the backend to flip the stream to "live")
- *   5. POST /api/live/streams/:id/playback-session   (one per viewer; may be anonymous)
- *   6. Viewer media check: decoded LiveKit frames, or HLS segments, whichever the playback
- *      session returns. Viewers must keep receiving media for the whole hold period.
- *   7. POST /api/live/streams/:id/end                (cleanup, then verifies status "ended")
- *
- * Inputs: users.json (the same seed file as the browser test).
- *
- * Examples:
- *   npx tsx .\live-stream-api-e2e.ts --probe
- *   npx tsx .\live-stream-api-e2e.ts --streamers 1 --viewers-per-stream 3 --duration-seconds 10
- *   npx tsx .\live-stream-api-e2e.ts --streamers 2 --viewers-per-stream 25 --duration-seconds 120 --ramp-ms 300
- *   npx tsx .\live-stream-api-e2e.ts --streamers 5 --viewers-per-stream 19 --viewer-auth --tokens-file .\tokens.json
- *
- * Flags:
- *   --probe               Log in one streamer, go live, print the REDACTED shape of the `publish` and
- *                         playback-session responses, end the stream, and exit. Use this first.
- *   --viewer-auth         Log each viewer in. Default is anonymous viewers (the playback-session route
- *                         accepts anonymous callers), because /auth/login is limited to a few per minute.
- *   --tokens-file <path>  Cache access tokens (JWTs) between runs so repeated runs skip logins.
- *                         The file contains live bearer tokens; keep it out of git.
- *   --takeover            Send takeover:true to go-live if the account already has an active live.
- *   --keep-streams        Do not end the lives at the end.
- *   --api-base <url>      Defaults to https://tubor-api.onrender.com
- */
-
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -74,6 +41,7 @@ const DEFAULTS = {
 type Config = typeof DEFAULTS & {
   keepStreams: boolean;
   viewerAuth: boolean;
+  noDecode: boolean;
   takeover: boolean;
   probe: boolean;
   cleanup: boolean;
@@ -268,6 +236,7 @@ function parseArgs(argv: string[]): Config {
     maxAccounts: numberArg('max-accounts', DEFAULTS.maxAccounts),
     keepStreams: Boolean(values['keep-streams']),
     viewerAuth: Boolean(values['viewer-auth']),
+    noDecode: Boolean(values['no-decode']),
     takeover: Boolean(values.takeover),
     probe: Boolean(values.probe),
     cleanup: Boolean(values.cleanup),
@@ -654,6 +623,55 @@ class SyntheticPublisher {
 async function startLiveKitViewer(url: string, token: string): Promise<ViewerHandle> {
   const room = new Room();
   const state = { frames: 0, lastProgressAt: 0, width: 0, height: 0, videoTracks: 0, dropped: false, consumeError: '' };
+  // --no-decode: no VideoStream, so no frame is ever copied into JavaScript. The frame count comes
+  // from the WebRTC inbound-rtp stats instead (framesReceived counts frames before decoding).
+  const rtp = { packets: 0, bytes: 0, decoded: 0 };
+  // What the stats call actually returned, so an empty result is explainable instead of silent.
+  const diag = { calls: 0, errors: 0, lastError: '', entries: 0, cases: new Set<string>(), kinds: new Set<string>() };
+  let statsTimer: NodeJS.Timeout | undefined;
+  let polling = false;
+
+  const pollStats = async (): Promise<void> => {
+    if (polling || !room.isConnected) return;
+    polling = true;
+    try {
+      const { publisherStats, subscriberStats } = await room.getRtcStats();
+      diag.calls += 1;
+      // A viewer publishes nothing, but with a single peer connection the receive stats may be
+      // listed under the publisher side, so look at both.
+      const all = [...subscriberStats, ...publisherStats];
+      diag.entries = all.length;
+      let frames = 0;
+      let packets = 0;
+      let bytes = 0;
+      let decoded = 0;
+      for (const { stats } of all) {
+        diag.cases.add(String(stats.case));
+        if (stats.case === 'inboundRtp') diag.kinds.add(String(stats.value.stream?.kind));
+        if (stats.case !== 'inboundRtp' || stats.value.stream?.kind !== 'video') continue;
+        const { inbound, received } = stats.value;
+        frames += Number(inbound?.framesReceived ?? 0n);
+        decoded += inbound?.framesDecoded ?? 0;
+        bytes += Number(inbound?.bytesReceived ?? 0n);
+        packets += Number(received?.packetsReceived ?? 0n);
+        state.width = inbound?.frameWidth ?? state.width;
+        state.height = inbound?.frameHeight ?? state.height;
+      }
+      rtp.packets = packets;
+      rtp.bytes = bytes;
+      rtp.decoded = decoded;
+      if (frames > state.frames) {
+        state.frames = frames;
+        state.lastProgressAt = Date.now();
+      }
+    } catch (error) {
+      // Usually a stats call that raced a disconnect; recorded so a persistent failure shows in the report.
+      diag.errors += 1;
+      diag.lastError = errorMessage(error).slice(0, 200);
+    } finally {
+      polling = false;
+    }
+  };
 
   const consume = (track: RemoteTrack): void => {
     state.videoTracks += 1;
@@ -678,7 +696,9 @@ async function startLiveKitViewer(url: string, token: string): Promise<ViewerHan
   };
 
   room.on(RoomEvent.TrackSubscribed, (track) => {
-    if (track.kind === TrackKind.KIND_VIDEO) consume(track);
+    if (track.kind !== TrackKind.KIND_VIDEO) return;
+    if (config.noDecode) state.videoTracks += 1;
+    else consume(track);
   });
   room.on(RoomEvent.Disconnected, () => {
     state.dropped = true;
@@ -699,6 +719,8 @@ async function startLiveKitViewer(url: string, token: string): Promise<ViewerHan
     if (timeout) clearTimeout(timeout);
   }
 
+  if (config.noDecode) statsTimer = setInterval(() => void pollStats(), 1_000);
+
   return {
     mode: 'livekit',
     units: () => state.frames,
@@ -707,8 +729,29 @@ async function startLiveKitViewer(url: string, token: string): Promise<ViewerHan
     staleAfterMs: 5_000,
     lastProgressAt: () => state.lastProgressAt,
     alive: () => room.isConnected && !state.dropped,
-    detail: () => ({ frames: state.frames, width: state.width, height: state.height, videoTracks: state.videoTracks, consumeError: state.consumeError || undefined }),
+    detail: () => ({
+      frames: state.frames,
+      width: state.width,
+      height: state.height,
+      videoTracks: state.videoTracks,
+      consumeError: state.consumeError || undefined,
+      ...(config.noDecode
+        ? {
+            decode: false,
+            rtpPackets: rtp.packets,
+            rtpBytes: rtp.bytes,
+            framesDecodedNatively: rtp.decoded,
+            statsCalls: diag.calls,
+            statsErrors: diag.errors,
+            statsLastError: diag.lastError || undefined,
+            statsEntries: diag.entries,
+            statsCases: [...diag.cases],
+            inboundKinds: [...diag.kinds],
+          }
+        : {}),
+    }),
     stop: async () => {
+      if (statsTimer) clearInterval(statsTimer);
       await room.disconnect().catch(() => undefined);
     },
   };
@@ -1057,6 +1100,7 @@ async function runProbe(streamer: SeedUser): Promise<void> {
 
 async function main(): Promise<void> {
   config = parseArgs(process.argv.slice(2));
+  joinSlots = new Semaphore(config.joinConcurrency);
   mkdirSync(RESULTS_DIR, { recursive: true });
   loadTokenCache();
 
@@ -1072,8 +1116,8 @@ async function main(): Promise<void> {
   if (requiredAccounts > config.maxAccounts) {
     throw new Error(`This run needs ${requiredAccounts} accounts, above --max-accounts=${config.maxAccounts}.`);
   }
-  if (viewerCount > 60) {
-    console.warn(`WARNING: ${viewerCount} LiveKit viewers decode video in this one process; CPU may become the bottleneck rather than the backend.`);
+  if (viewerCount > 60 && !config.noDecode) {
+    console.warn(`WARNING: ${viewerCount} LiveKit viewers decode video in this one process; CPU may become the bottleneck rather than the backend. Pass --no-decode to count received frames from WebRTC stats instead.`);
   }
 
   const health = await api('GET', '/health');

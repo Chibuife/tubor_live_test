@@ -1,0 +1,1111 @@
+{
+  "test": "Tubor EX backend-only live-stream test (MediaMTX)",
+  "startedAt": "2026-11-02T07:18:54.779Z",
+  "target": "https://tubor-api.onrender.com",
+  "usersFile": "C:\\Users\\dell\\test\\users.json",
+  "seedGeneratedAt": "2026-09-30T09:39:05.957Z",
+  "configuration": {
+    "streamers": 1,
+    "viewersPerStream": 50,
+    "requestedViewers": 50,
+    "viewerAuth": false,
+    "durationSeconds": 15,
+    "rampMs": 250,
+    "keepStreams": false,
+    "publish": "rtmp via docker ffmpeg, 640x360@15fps, 150 kbit/s",
+    "viewers": "LL-HLS, no decode, >= 5 video parts"
+  },
+  "finishedAt": "2026-11-02T07:20:58.131Z",
+  "fatalError": null,
+  "http": {
+    "requests": 62,
+    "http429": 0,
+    "transientRetries": 1,
+    "logins": 1,
+    "cachedLogins": 0
+  },
+  "generator": {
+    "cpuPercentMax": 99,
+    "cpuPercentAvg": 41,
+    "saturated": true,
+    "freeMemMbMin": 316,
+    "eventLoopDelayMs": {
+      "p99": 37.4,
+      "max": 74.3
+    },
+    "downloadMbps": {
+      "avg": 1.5,
+      "peak": 4.8
+    }
+  },
+  "streams": [
+    {
+      "index": 1,
+      "username": "luciao14",
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "started",
+      "resumed": false,
+      "timeToLiveMs": 20541,
+      "currentViewersReportedByApi": 0,
+      "publisherStayedRunning": false,
+      "publisherLastStderr": "[vost#0:0/libx264 @ 0x7906635abac0] Error submitting a packet to the muxer: End of file\n[out#0/flv @ 0x790667f765c0] Error writing trailer: End of file\n[out#0/flv @ 0x790667f765c0] Error closing file: End of file",
+      "cleanup": {
+        "ok": true,
+        "details": "Ended through the API and verified as \"ended\"."
+      }
+    }
+  ],
+  "viewers": [
+    {
+      "viewer": "anon-1",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 480,
+      "firstMediaMs": 4875,
+      "totalToFirstMediaMs": 5355,
+      "partsAtJoin": 11,
+      "partsFinal": 71,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 71,
+        "bytes": 664527,
+        "ttffMs": 3954,
+        "stalls": 5,
+        "errors": [
+          "fetch failed",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":71,\"bytes\":664527,\"ttffMs\":3954,\"stalls\":5,\"errors\":[\"fetch failed\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-2",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 877,
+      "firstMediaMs": 4823,
+      "totalToFirstMediaMs": 5700,
+      "partsAtJoin": 13,
+      "partsFinal": 68,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 68,
+        "bytes": 637052,
+        "ttffMs": 3042,
+        "stalls": 5,
+        "errors": [
+          "fetch failed",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":68,\"bytes\":637052,\"ttffMs\":3042,\"stalls\":5,\"errors\":[\"fetch failed\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-3",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 842,
+      "firstMediaMs": 6259,
+      "totalToFirstMediaMs": 7101,
+      "partsAtJoin": 11,
+      "partsFinal": 59,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 59,
+        "bytes": 569776,
+        "ttffMs": 4555,
+        "stalls": 5,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":59,\"bytes\":569776,\"ttffMs\":4555,\"stalls\":5,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-4",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 886,
+      "firstMediaMs": 5101,
+      "totalToFirstMediaMs": 5987,
+      "partsAtJoin": 10,
+      "partsFinal": 61,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 61,
+        "bytes": 555199,
+        "ttffMs": 4255,
+        "stalls": 4,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":61,\"bytes\":555199,\"ttffMs\":4255,\"stalls\":4,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-5",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 811,
+      "firstMediaMs": 9213,
+      "totalToFirstMediaMs": 10024,
+      "partsAtJoin": 10,
+      "partsFinal": 50,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 50,
+        "bytes": 452215,
+        "ttffMs": 8295,
+        "stalls": 4,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":50,\"bytes\":452215,\"ttffMs\":8295,\"stalls\":4,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-6",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 454,
+      "firstMediaMs": 6371,
+      "totalToFirstMediaMs": 6825,
+      "partsAtJoin": 11,
+      "partsFinal": 62,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 62,
+        "bytes": 556639,
+        "ttffMs": 4814,
+        "stalls": 5,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":62,\"bytes\":556639,\"ttffMs\":4814,\"stalls\":5,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-7",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 482,
+      "firstMediaMs": 8571,
+      "totalToFirstMediaMs": 9053,
+      "partsAtJoin": 11,
+      "partsFinal": 55,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 55,
+        "bytes": 499041,
+        "ttffMs": 6719,
+        "stalls": 5,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":55,\"bytes\":499041,\"ttffMs\":6719,\"stalls\":5,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-8",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 540,
+      "firstMediaMs": 6123,
+      "totalToFirstMediaMs": 6663,
+      "partsAtJoin": 12,
+      "partsFinal": 59,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 59,
+        "bytes": 548386,
+        "ttffMs": 5221,
+        "stalls": 4,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":59,\"bytes\":548386,\"ttffMs\":5221,\"stalls\":4,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-9",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 520,
+      "firstMediaMs": 8662,
+      "totalToFirstMediaMs": 9182,
+      "partsAtJoin": 12,
+      "partsFinal": 52,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 52,
+        "bytes": 462067,
+        "ttffMs": 6892,
+        "stalls": 3,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":52,\"bytes\":462067,\"ttffMs\":6892,\"stalls\":3,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-10",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 490,
+      "firstMediaMs": 9459,
+      "totalToFirstMediaMs": 9949,
+      "partsAtJoin": 11,
+      "partsFinal": 46,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 46,
+        "bytes": 400369,
+        "ttffMs": 8291,
+        "stalls": 4,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":46,\"bytes\":400369,\"ttffMs\":8291,\"stalls\":4,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-11",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 843,
+      "firstMediaMs": 12200,
+      "totalToFirstMediaMs": 13043,
+      "partsAtJoin": 9,
+      "partsFinal": 36,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 36,
+        "bytes": 333644,
+        "ttffMs": 10889,
+        "stalls": 4,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":36,\"bytes\":333644,\"ttffMs\":10889,\"stalls\":4,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-12",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 442,
+      "firstMediaMs": 11177,
+      "totalToFirstMediaMs": 11620,
+      "partsAtJoin": 9,
+      "partsFinal": 38,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 38,
+        "bytes": 368795,
+        "ttffMs": 9493,
+        "stalls": 2,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":38,\"bytes\":368795,\"ttffMs\":9493,\"stalls\":2,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-13",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 486,
+      "firstMediaMs": 9268,
+      "totalToFirstMediaMs": 9754,
+      "partsAtJoin": 10,
+      "partsFinal": 49,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 49,
+        "bytes": 415010,
+        "ttffMs": 8335,
+        "stalls": 6,
+        "errors": [
+          "fetch failed",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":49,\"bytes\":415010,\"ttffMs\":8335,\"stalls\":6,\"errors\":[\"fetch failed\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-14",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 451,
+      "firstMediaMs": 14235,
+      "totalToFirstMediaMs": 14686,
+      "partsAtJoin": 11,
+      "partsFinal": 30,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 30,
+        "bytes": 278251,
+        "ttffMs": 12592,
+        "stalls": 4,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":30,\"bytes\":278251,\"ttffMs\":12592,\"stalls\":4,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-15",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 500,
+      "firstMediaMs": 12953,
+      "totalToFirstMediaMs": 13453,
+      "partsAtJoin": 12,
+      "partsFinal": 38,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 38,
+        "bytes": 349666,
+        "ttffMs": 10880,
+        "stalls": 6,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":38,\"bytes\":349666,\"ttffMs\":10880,\"stalls\":6,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-16",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 529,
+      "firstMediaMs": 14286,
+      "totalToFirstMediaMs": 14815,
+      "partsAtJoin": 10,
+      "partsFinal": 32,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 32,
+        "bytes": 299648,
+        "ttffMs": 12889,
+        "stalls": 5,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":32,\"bytes\":299648,\"ttffMs\":12889,\"stalls\":5,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-17",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 593,
+      "firstMediaMs": 15428,
+      "totalToFirstMediaMs": 16021,
+      "partsAtJoin": 7,
+      "partsFinal": 25,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 25,
+        "bytes": 229246,
+        "ttffMs": 13818,
+        "stalls": 6,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":25,\"bytes\":229246,\"ttffMs\":13818,\"stalls\":6,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-18",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 431,
+      "firstMediaMs": 14505,
+      "totalToFirstMediaMs": 14936,
+      "partsAtJoin": 8,
+      "partsFinal": 28,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 28,
+        "bytes": 252987,
+        "ttffMs": 13057,
+        "stalls": 3,
+        "errors": [
+          "fetch failed",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":28,\"bytes\":252987,\"ttffMs\":13057,\"stalls\":3,\"errors\":[\"fetch failed\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-19",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 491,
+      "firstMediaMs": 17419,
+      "totalToFirstMediaMs": 17910,
+      "partsAtJoin": 8,
+      "partsFinal": 22,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 22,
+        "bytes": 215199,
+        "ttffMs": 14126,
+        "stalls": 3,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":22,\"bytes\":215199,\"ttffMs\":14126,\"stalls\":3,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-20",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 468,
+      "firstMediaMs": 19323,
+      "totalToFirstMediaMs": 19791,
+      "partsAtJoin": 9,
+      "partsFinal": 20,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 20,
+        "bytes": 180295,
+        "ttffMs": 15770,
+        "stalls": 3,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":20,\"bytes\":180295,\"ttffMs\":15770,\"stalls\":3,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-21",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 521,
+      "firstMediaMs": 20309,
+      "totalToFirstMediaMs": 20830,
+      "partsAtJoin": 10,
+      "partsFinal": 17,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 17,
+        "bytes": 165815,
+        "ttffMs": 18403,
+        "stalls": 4,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":17,\"bytes\":165815,\"ttffMs\":18403,\"stalls\":4,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-22",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 582,
+      "firstMediaMs": 21017,
+      "totalToFirstMediaMs": 21599,
+      "partsAtJoin": 10,
+      "partsFinal": 19,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 19,
+        "bytes": 153007,
+        "ttffMs": 19058,
+        "stalls": 5,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":19,\"bytes\":153007,\"ttffMs\":19058,\"stalls\":5,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-23",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 490,
+      "firstMediaMs": 19870,
+      "totalToFirstMediaMs": 20360,
+      "partsAtJoin": 10,
+      "partsFinal": 20,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 20,
+        "bytes": 172799,
+        "ttffMs": 17930,
+        "stalls": 5,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":20,\"bytes\":172799,\"ttffMs\":17930,\"stalls\":5,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-24",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 441,
+      "firstMediaMs": 20295,
+      "totalToFirstMediaMs": 20736,
+      "partsAtJoin": 9,
+      "partsFinal": 16,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 16,
+        "bytes": 132982,
+        "ttffMs": 18246,
+        "stalls": 5,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":16,\"bytes\":132982,\"ttffMs\":18246,\"stalls\":5,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-25",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 458,
+      "firstMediaMs": 21473,
+      "totalToFirstMediaMs": 21931,
+      "partsAtJoin": 8,
+      "partsFinal": 14,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 14,
+        "bytes": 121664,
+        "ttffMs": 18725,
+        "stalls": 5,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":14,\"bytes\":121664,\"ttffMs\":18725,\"stalls\":5,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-26",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 461,
+      "firstMediaMs": 21092,
+      "totalToFirstMediaMs": 21553,
+      "partsAtJoin": 8,
+      "partsFinal": 12,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 12,
+        "bytes": 113340,
+        "ttffMs": 19777,
+        "stalls": 4,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":12,\"bytes\":113340,\"ttffMs\":19777,\"stalls\":4,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-27",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 442,
+      "firstMediaMs": 21870,
+      "totalToFirstMediaMs": 22312,
+      "partsAtJoin": 7,
+      "partsFinal": 9,
+      "stillReceivingAtEnd": false,
+      "detail": {
+        "videoParts": 9,
+        "bytes": 107033,
+        "ttffMs": 20186,
+        "stalls": 3,
+        "errors": [
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404",
+          "playlist HTTP 404"
+        ]
+      },
+      "error": "Stopped receiving media during the hold period. {\"videoParts\":9,\"bytes\":107033,\"ttffMs\":20186,\"stalls\":3,\"errors\":[\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\",\"playlist HTTP 404\"]}"
+    },
+    {
+      "viewer": "anon-28",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 566,
+      "error": "Media arrived but then stalled (no new video parts in 2000ms). {\"videoParts\":5,\"bytes\":45955,\"ttffMs\":21015,\"stalls\":1,\"errors\":[]}",
+      "detail": {
+        "videoParts": 5,
+        "bytes": 45955,
+        "ttffMs": 21015,
+        "stalls": 1,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-29",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 492,
+      "error": "Only 3/5 LL-HLS video parts within 30000ms. {\"videoParts\":3,\"bytes\":29863,\"ttffMs\":21341,\"stalls\":1,\"errors\":[]}",
+      "detail": {
+        "videoParts": 3,
+        "bytes": 29863,
+        "ttffMs": 21341,
+        "stalls": 1,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-30",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 866,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":1315,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 1315,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-31",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 483,
+      "error": "Only 1/5 LL-HLS video parts within 30000ms. {\"videoParts\":1,\"bytes\":14259,\"ttffMs\":29684,\"stalls\":1,\"errors\":[]}",
+      "detail": {
+        "videoParts": 1,
+        "bytes": 14259,
+        "ttffMs": 29684,
+        "stalls": 1,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-32",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 439,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-33",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 489,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-34",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 561,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-35",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 508,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-36",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 538,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-37",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 714,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-38",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 531,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-39",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 507,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-40",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 556,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-41",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 499,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-42",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 497,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-43",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 506,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-44",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 542,
+      "error": "Only 0/5 LL-HLS video parts within 30000ms. {\"videoParts\":0,\"bytes\":0,\"ttffMs\":null,\"stalls\":0,\"errors\":[]}",
+      "detail": {
+        "videoParts": 0,
+        "bytes": 0,
+        "ttffMs": null,
+        "stalls": 0,
+        "errors": []
+      }
+    },
+    {
+      "viewer": "anon-45",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 470,
+      "error": "The operation was aborted due to timeout"
+    },
+    {
+      "viewer": "anon-46",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 539,
+      "error": "The operation was aborted due to timeout"
+    },
+    {
+      "viewer": "anon-47",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 481,
+      "error": "The operation was aborted due to timeout"
+    },
+    {
+      "viewer": "anon-48",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 499,
+      "error": "The operation was aborted due to timeout"
+    },
+    {
+      "viewer": "anon-49",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 500,
+      "error": "The operation was aborted due to timeout"
+    },
+    {
+      "viewer": "anon-50",
+      "streamIndex": 1,
+      "streamId": "545bbddf-3044-42d2-9ba9-d4225020bc27",
+      "status": "failed",
+      "playbackSessionMs": 492,
+      "error": "The operation was aborted due to timeout"
+    }
+  ],
+  "summary": {
+    "broadcastersRequested": 1,
+    "broadcastersStarted": 1,
+    "droppedPublishers": 1,
+    "viewersRequested": 50,
+    "viewersPassed": 0,
+    "viewersFailed": 50,
+    "mediaPassRate": 0,
+    "timeToLiveMs": {
+      "p50": 20541,
+      "max": 20541
+    },
+    "viewerFirstMediaMs": {
+      "p50": 12953,
+      "p95": 21473,
+      "max": 21870
+    },
+    "hls": {
+      "partArrivalDelayMs": {
+        "p50": 2156,
+        "p95": 24256
+      },
+      "stallsTotal": 117,
+      "megabytesDownloaded": 9.2,
+      "totalMegabytesDownloadedIncludingFailedViewers": 9.3,
+      "neededMbpsAtRealTime": 13.9
+    },
+    "generator": {
+      "cpuPercentMax": 99,
+      "cpuPercentAvg": 41,
+      "saturated": true,
+      "freeMemMbMin": 316,
+      "eventLoopDelayMs": {
+        "p99": 37.4,
+        "max": 74.3
+      },
+      "downloadMbps": {
+        "avg": 1.5,
+        "peak": 4.8
+      }
+    },
+    "http429Responses": 0,
+    "cleanupFailures": 0,
+    "result": "FAILED",
+    "note": "The load generator CPU was saturated (generator.saturated), so failures may be this machine, not the backend. Download throughput peaked at 4.8 Mbit/s while 50 viewers need about 14 at real time, so media was not delivered at full rate. Compare 4.8 Mbit/s with a speed test of this machine: if it is close, this connection is the limit; if it is well below, the media host or its auth path is not delivering fast enough (re-running with a lower --bitrate and getting the same failures also points at the host)."
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "runId": "91285",
+  "emailDomain": "e2e.tubor.test",
+  "accounts": [
+    {
+      "wave": 1,
+      "email": "e2e-91285-w1n001@e2e.tubor.test",
+      "username": "e2e91285w1n001",
+      "userId": "19d61bd4-0db1-4bd4-aeeb-7d71624c5fa9"
+    },
+    {
+      "wave": 1,
+      "email": "e2e-91285-w1n002@e2e.tubor.test",
+      "username": "e2e91285w1n002",
+      "userId": "ee31700c-4d37-4752-96bc-024e8ec1d52f"
+    },
+    {
+      "wave": 1,
+      "email": "e2e-91285-w1n003@e2e.tubor.test",
+      "username": "e2e91285w1n003",
+      "userId": "5810b879-df5c-40e7-bc19-091b61e09f96"
+    },
+    {
+      "wave": 1,
+      "email": "e2e-91285-w1n004@e2e.tubor.test",
+      "username": "e2e91285w1n004",
+      "userId": "017220e1-46e5-449d-8bc5-fc4292ca9a18"
+    },
+    {
+      "wave": 1,
+      "email": "e2e-91285-w1n005@e2e.tubor.test",
+      "username": "e2e91285w1n005",
+      "userId": "0aace7ca-aab4-441a-8128-5be406604ee7"
+    },
+    {
+      "wave": 1,
+      "email": "e2e-91285-w1n006@e2e.tubor.test",
+      "username": "e2e91285w1n006",
+      "userId": "57c89433-ae3e-407d-815a-664894e92c5f"
+    },
+    {
+      "wave": 1,
+      "email": "e2e-91285-w1n007@e2e.tubor.test",
+      "username": "e2e91285w1n007",
+      "userId": "41f5b611-c5df-45f0-9009-9b16e44db9e3"
+    },
+    {
+      "wave": 1,
+      "email": "e2e-91285-w1n008@e2e.tubor.test",
+      "username": "e2e91285w1n008",
+      "userId": "5589bd80-1831-4d20-b850-58e91401c503"
+    },
+    {
+      "wave": 1,
+      "email": "e2e-91285-w1n009@e2e.tubor.test",
+      "username": "e2e91285w1n009",
+      "userId": "8b44ba1d-b76e-4e48-8fed-c2fea19a5935"
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "test": "Tubor EX sign-up / authentication ramp test",
+  "runId": "f07e1",
+  "startedAt": "2026-10-28T17:30:37.571Z",
+  "apiBase": "https://tubor-api.onrender.com",
+  "wavePlan": [
+    50,
+    70,
+    100
+  ],
+  "loginCheck": true,
+  "maxRateLimitRetries": 60,
+  "finishedAt": "2026-10-28T17:34:21.205Z",
+  "fatalError": null,
+  "interrupted": false,
+  "http": {
+    "requests": 440,
+    "http429": 0,
+    "transientRetries": 0
+  },
+  "waves": [
+    {
+      "wave": 1,
+      "requested": 50,
+      "created": 50,
+      "signupFailed": 0,
+      "signupSkipped": 0,
+      "signupFailuresByStatus": {},
+      "loginPassed": 50,
+      "loginBlockedUnverified": 0,
+      "loginFailed": 0,
+      "http429": 0,
+      "signupAttemptMs": {
+        "p50": 2757,
+        "p95": 4919,
+        "max": 5803
+      },
+      "signupTotalMs": {
+        "p50": 2757,
+        "p95": 4919,
+        "max": 5808
+      },
+      "loginAttemptMs": {
+        "p50": 2296,
+        "p95": 3089,
+        "max": 3246
+      },
+      "signupPhaseSeconds": 32.8,
+      "loginPhaseSeconds": 24.4,
+      "signupsPerMinute": 91.34,
+      "result": "PASSED"
+    },
+    {
+      "wave": 2,
+      "requested": 70,
+      "created": 70,
+      "signupFailed": 0,
+      "signupSkipped": 0,
+      "signupFailuresByStatus": {},
+      "loginPassed": 70,
+      "loginBlockedUnverified": 0,
+      "loginFailed": 0,
+      "http429": 0,
+      "signupAttemptMs": {
+        "p50": 2471,
+        "p95": 3001,
+        "max": 3404
+      },
+      "signupTotalMs": {
+        "p50": 2471,
+        "p95": 3001,
+        "max": 3406
+      },
+      "loginAttemptMs": {
+        "p50": 2304,
+        "p95": 2947,
+        "max": 3192
+      },
+      "signupPhaseSeconds": 35.4,
+      "loginPhaseSeconds": 34.1,
+      "signupsPerMinute": 118.69,
+      "result": "PASSED"
+    },
+    {
+      "wave": 3,
+      "requested": 100,
+      "created": 100,
+      "signupFailed": 0,
+      "signupSkipped": 0,
+      "signupFailuresByStatus": {},
+      "loginPassed": 100,
+      "loginBlockedUnverified": 0,
+      "loginFailed": 0,
+      "http429": 0,
+      "signupAttemptMs": {
+        "p50": 2409,
+        "p95": 2888,
+        "max": 3695
+      },
+      "signupTotalMs": {
+        "p50": 2409,
+        "p95": 2888,
+        "max": 3695
+      },
+      "loginAttemptMs": {
+        "p50": 2172,
+        "p95": 2774,
+        "max": 2992
+      },
+      "signupPhaseSeconds": 49.9,
+      "loginPhaseSeconds": 45.7,
+      "signupsPerMinute": 120.21,
+      "result": "PASSED"
+    }
+  ],
+  "failedAccounts": [],
+  "result": "PASSED"
+}
